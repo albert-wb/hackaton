@@ -72,48 +72,6 @@ export function occurrencesUntil(all: Occurrence[], t: number): Occurrence[] {
   return all.filter((o) => o.minutes <= t * STEP_MINUTES);
 }
 
-export type AlertKind = 'saturacao' | 'esgotada';
-export type Priority = 'Crítica' | 'Alta';
-
-export interface AlertInfo {
-  regionId: RegionId;
-  kind: AlertKind;
-  /** minutos até a saturação (arredondado, ≥ 1) quando kind = saturacao */
-  etaMinutes: number | null;
-  priority: Priority;
-  markers: string[];
-}
-
-export function alertMarkers(steps: StepResult[], regions: Region[], hazard: Hazard, regionId: RegionId, t: number): string[] {
-  const cur = steps[t].regions[regionId];
-  const prev = t > 0 ? steps[t - 1].regions[regionId] : null;
-  const region = regions.find((r) => r.id === regionId)!;
-  const m: string[] = [];
-  if (prev && cur.active > prev.active) m.push('Demanda em alta');
-  if (prev && cur.teamsFree < prev.teamsFree) m.push('Recursos em queda');
-  if (steps[t].weather >= 40) m.push(hazard === 'chuva' ? 'Chuva intensa' : 'Calor extremo');
-  if (region.vulnerability >= 0.8) m.push('Vulnerabilidade elevada');
-  return m;
-}
-
-/** Alertas ativos no passo t, o mais grave primeiro (esgotada, depois menor tempo até saturação). */
-export function alertsAt(steps: StepResult[], regions: Region[], hazard: Hazard, t: number): AlertInfo[] {
-  const list: AlertInfo[] = [];
-  for (const r of regions) {
-    const p = steps[t].regions[r.id];
-    if (p.etaMinutes === 'saturado') {
-      list.push({ regionId: r.id, kind: 'esgotada', etaMinutes: null, priority: 'Crítica', markers: alertMarkers(steps, regions, hazard, r.id, t) });
-    } else if (p.alert && typeof p.etaMinutes === 'number') {
-      list.push({
-        regionId: r.id, kind: 'saturacao', etaMinutes: Math.max(1, Math.round(p.etaMinutes)),
-        priority: p.etaMinutes <= 5 ? 'Crítica' : 'Alta', markers: alertMarkers(steps, regions, hazard, r.id, t)
-      });
-    }
-  }
-  const sev = (a: AlertInfo) => (a.kind === 'esgotada' ? -1 : a.etaMinutes ?? 99);
-  return list.sort((a, b) => sev(a) - sev(b));
-}
-
 export interface AlertEvent {
   t: number;
   regionId: RegionId;
@@ -152,45 +110,6 @@ export function leadMinutes(events: AlertEvent[]): number | null {
   return best ? best.lead : null;
 }
 
-export type RainTrend = 'inicio' | 'aumentando' | 'estavel' | 'diminuindo';
-
-export interface Conditions {
-  weatherNow: number;
-  /** mm acumulados desde 14:00 (soma de mm/h ÷ 6) — apenas chuva */
-  accumulatedMm: number;
-  /** máximo do índice de calor desde 14:00 — apenas calor */
-  maxHeat: number;
-  trend: RainTrend;
-  biggestGrowth: { regionId: RegionId; delta: number } | null;
-  fewestTeams: { regionId: RegionId; free: number; total: number };
-}
-
-export function conditionsAt(steps: StepResult[], regions: Region[], t: number): Conditions {
-  const w = steps.slice(0, t + 1).map((s) => s.weather);
-  const accumulatedMm = w.reduce((a, b) => a + b / 6, 0);
-  let trend: RainTrend = 'inicio';
-  if (t > 0) trend = w[t] > w[t - 1] ? 'aumentando' : w[t] < w[t - 1] ? 'diminuindo' : 'estavel';
-  let biggest: Conditions['biggestGrowth'] = null;
-  if (t > 0) {
-    for (const r of regions) {
-      const d = steps[t].regions[r.id].active - steps[t - 1].regions[r.id].active;
-      if (d > 0 && (biggest === null || d > biggest.delta)) biggest = { regionId: r.id, delta: d };
-    }
-  }
-  let fewest = { regionId: regions[0].id, free: Infinity, total: 1, ratio: Infinity };
-  for (const r of regions) {
-    const p = steps[t].regions[r.id];
-    const ratio = p.teamsFree / p.teamsTotal;
-    if (p.teamsFree < fewest.free || (p.teamsFree === fewest.free && ratio < fewest.ratio)) {
-      fewest = { regionId: r.id, free: p.teamsFree, total: p.teamsTotal, ratio };
-    }
-  }
-  return {
-    weatherNow: w[t], accumulatedMm, maxHeat: Math.max(...w), trend, biggestGrowth: biggest,
-    fewestTeams: { regionId: fewest.regionId, free: fewest.free, total: fewest.total }
-  };
-}
-
 export interface Totals {
   active: number;
   free: number;
@@ -211,4 +130,38 @@ export function regionsByPressure(steps: StepResult[], regions: Region[], t: num
     .map((r, i) => ({ r, i, s: steps[t].regions[r.id].rawScore }))
     .sort((a, b) => b.s - a.s || a.i - b.i)
     .map((x) => x.r);
+}
+
+export interface FeedEntry {
+  t: number;
+  time: string;
+  regionId: RegionId;
+  kind: 'alerta' | 'esgotada';
+  text: string;
+}
+
+/** Feed de alertas até o passo t, do mais recente para o mais antigo (um item por evento, sem repetir nos passos seguintes). */
+export function alertFeedAt(steps: StepResult[], regions: Region[], t: number): FeedEntry[] {
+  const name = (id: RegionId) => regions.find((r) => r.id === id)!.name;
+  return alertEventsUntil(steps, regions, t)
+    .map((e, i) => ({
+      i,
+      entry: {
+        t: e.t,
+        time: stepClock(e.t),
+        regionId: e.regionId,
+        kind: e.kind,
+        text: e.kind === 'esgotada'
+          ? `${name(e.regionId)}: capacidade esgotada`
+          : `Alerta ${name(e.regionId)}: possível saturação em ~${e.etaMinutes} min`
+      } satisfies FeedEntry
+    }))
+    .sort((a, b) => b.entry.t - a.entry.t || b.i - a.i)
+    .map((x) => x.entry);
+}
+
+/** Primeiro passo em que há alerta no cenário inteiro (para "Ir ao primeiro alerta"). */
+export function firstAlert(steps: StepResult[], regions: Region[]): { t: number; regionId: RegionId } | null {
+  const e = alertEventsUntil(steps, regions, steps.length - 1).find((x) => x.kind === 'alerta');
+  return e ? { t: e.t, regionId: e.regionId } : null;
 }
