@@ -129,3 +129,10 @@ O repositório tem 5 branches individuais, todas criadas a partir do mesmo commi
 
 Autenticação, dados reais de Defesa Civil, previsão meteorológica de verdade, Relatórios e Configurações, e qualquer
 integração com órgãos externos.
+
+## Membros do projeto 
+- Albert William
+- Amanda Albuquerque Silva
+- Filipe José
+- Laís Bembo de Freitas
+- Natthan Silvestri Weis Ferreira da Costa
