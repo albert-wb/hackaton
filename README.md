@@ -133,6 +133,6 @@ integração com órgãos externos.
 ## Membros do projeto 
 - Albert William
 - Amanda Albuquerque Silva
-- Filipe José
+- Filipe José Rigonatto Ortiz
 - Laís Bembo de Freitas
 - Natthan Silvestri Weis Ferreira da Costa
