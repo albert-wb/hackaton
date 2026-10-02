@@ -17,3 +17,10 @@ export function signed(n: number, decimals = 0): string {
   if (n < 0) return `−${v}`;
   return v;
 }
+
+/** Situação de saturação de uma região, em frase curta. */
+export function etaLine(eta: number | 'saturado' | null): string {
+  if (eta === 'saturado') return 'Capacidade esgotada';
+  if (eta === null) return 'Sem tendência';
+  return `Saturação em ~${Math.max(1, Math.round(eta))} min`;
+}

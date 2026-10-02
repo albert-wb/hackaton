@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 /** Ícones de linha (24×24, traço 1,5). Desenhados à mão, monocromáticos (currentColor). */
 const P: Record<string, ReactNode> = {
+  grid: <path d="M4 4h6v6H4V4ZM14 4h6v6h-6V4ZM4 14h6v6H4v-6ZM14 14h6v6h-6v-6Z" />,
   home: <path d="M3 11 12 4l9 7M5 10v10h5v-6h4v6h5V10" />,
   map: <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2ZM9 4v14M15 6v14" />,
   chart: <path d="M4 20h16M7 17v-5M12 17V6M17 17v-8" />,

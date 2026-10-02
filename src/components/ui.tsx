@@ -28,21 +28,20 @@ export function CardHead({ icon, title, sub, right }: { icon: IconName; title: s
   );
 }
 
-/** Forma do nível: círculo, triângulo, losango, octógono. Cor + forma (nunca só cor). */
-export function LevelIcon({ level, size = 12, color, outline }: { level: LevelIndex; size?: number; color?: string; outline?: boolean }) {
-  const fill = color ?? levelColor(level);
-  const o = outline ? { stroke: '#0a0a0a', strokeWidth: 0.9 } : {};
+/** Forma do nível: círculo vazado, triângulo, losango, octógono preenchido. Cor + forma (nunca só cor). */
+export function LevelIcon({ level, size = 12, color, onWhite }: { level: LevelIndex; size?: number; color?: string; onWhite?: boolean }) {
+  const c = color ?? (onWhite && level !== 3 ? '#0a0a0a' : levelColor(level));
   return (
     <svg width={size} height={size} viewBox="0 0 10 10" aria-hidden="true" style={{ flex: 'none', overflow: 'visible' }}>
-      {level === 0 && <circle cx="5" cy="5" r="4.4" fill={fill} {...o} />}
-      {level === 1 && <polygon points="5,0.5 9.7,9.2 0.3,9.2" fill={fill} {...o} />}
-      {level === 2 && <polygon points="5,0.2 9.8,5 5,9.8 0.2,5" fill={fill} {...o} />}
-      {level === 3 && <polygon points="3,0.2 7,0.2 9.8,3 9.8,7 7,9.8 3,9.8 0.2,7 0.2,3" fill={fill} {...o} />}
+      {level === 0 && <circle cx="5" cy="5" r="3.9" fill="none" stroke={c} strokeWidth="1.6" />}
+      {level === 1 && <polygon points="5,0.5 9.7,9.2 0.3,9.2" fill={c} />}
+      {level === 2 && <polygon points="5,0.2 9.8,5 5,9.8 0.2,5" fill={c} />}
+      {level === 3 && <polygon points="3,0.2 7,0.2 9.8,3 9.8,7 7,9.8 3,9.8 0.2,7 0.2,3" fill={c} />}
     </svg>
   );
 }
 
-/** Pílula do nível: ícone + nome em caixa-alta, contorno e tinta (16%) na cor do nível. */
+/** Pílula do nível: ícone + nome em caixa-alta, contorno e tinta na cor do nível. */
 export function LevelPill({ level }: { level: LevelIndex }) {
   return (
     <span className="pill" style={{ border: `1px solid ${levelColor(level)}`, background: levelTint(level) }}>
@@ -52,28 +51,21 @@ export function LevelPill({ level }: { level: LevelIndex }) {
   );
 }
 
-/** Barra pontilhada de 10 segmentos. */
-export function DotBar({ value, max, color = '#f5f5f5', segments = 10 }: { value: number; max: number; color?: string; segments?: number }) {
+/** Barra pontilhada: `segments` quadradinhos de 4×4 px espalhados na largura. Preenchidos = proporcional a value/max. */
+export function DotBar({ value, max, segments = 20, color = '#f5f5f5', className = '' }: { value: number; max: number; segments?: number; color?: string; className?: string }) {
   let filled = Math.round((value / max) * segments);
   if (value > 0 && filled === 0) filled = 1;
   return (
-    <span className="flex gap-[2px]" role="img" aria-label={`${filled} de ${segments}`}>
+    <span className={`flex w-full justify-between ${className}`} role="img" aria-label={`${filled} de ${segments} segmentos`}>
       {Array.from({ length: segments }, (_, i) => (
-        <span key={i} style={{ width: 5, height: 8, borderRadius: 1, background: i < filled ? color : '#2a2a2a' }} />
+        <span key={i} style={{ width: 4, height: 4, borderRadius: 1, background: i < filled ? color : '#333333' }} />
       ))}
     </span>
   );
 }
 
-/**
- * Variação: a seta mostra a direção numérica; a cor mostra se é bom ou ruim.
- * Piora = âmbar, melhora = verde, sem mudança = cinza (inverso da imagem de tema).
- */
-export function deltaTone(delta: number, worseWhen: 'up' | 'down'): 'piora' | 'melhora' | 'neutra' {
-  if (delta === 0) return 'neutra';
-  return (delta > 0) === (worseWhen === 'up') ? 'piora' : 'melhora';
-}
-export const toneColor = (t: 'piora' | 'melhora' | 'neutra'): string => `var(--variacao-${t})`;
+/** Variação: a seta mostra a direção numérica; só há dois tons de cinza (sem verde nem vermelho). */
+export const deltaColor = (delta: number | null): string => (delta ? '#f5f5f5' : '#a3a3a3');
 
 export function Arrow({ delta, size = 12 }: { delta: number; size?: number }) {
   if (delta > 0) return <Icon name="arrowUp" size={size} strokeWidth={2} />;
@@ -81,7 +73,7 @@ export function Arrow({ delta, size = 12 }: { delta: number; size?: number }) {
   return <Icon name="arrowRight" size={size} strokeWidth={2} />;
 }
 
-export function Tip({ text, children, side = 'top', className = '' }: { text: string; children: ReactNode; side?: 'top' | 'right' | 'below'; className?: string }) {
+export function Tip({ text, children, side = 'top', className = '' }: { text: ReactNode; children: ReactNode; side?: 'top' | 'right' | 'below'; className?: string }) {
   const cls = side === 'right' ? 'tip tip-right' : side === 'below' ? 'tip tip-below' : 'tip';
   return (
     <span className={`${cls} ${className}`}>

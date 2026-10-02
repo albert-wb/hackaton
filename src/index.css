@@ -17,17 +17,15 @@
   --color-t3: #6e6e6e;
 }
 
-/* Cores de status: só em marcas pequenas (ícone, pílula, contorno, tinta a 16%).
-   Para trocá-las por cinzas (#9A9A9A, #BDBDBD, #DDDDDD, #FFFFFF), basta redefinir estas variáveis:
-   ícones, padrões e rótulos continuam diferenciando os níveis. */
+/* Cor só em um lugar: o vermelho de CRÍTICO, saturação e capacidade esgotada.
+   Os demais níveis são cinzas e se distinguem por ícone, padrão e nome.
+   Para trocar as cores depois, basta redefinir estas variáveis; nenhum componente usa valores fixos. */
 :root {
-  --nivel-normal: #5fb58a;
-  --nivel-atencao: #d4a93a;
-  --nivel-elevado: #e08a3c;
+  --nivel-normal: #9a9a9a;
+  --nivel-atencao: #bdbdbd;
+  --nivel-elevado: #e8e8e8;
   --nivel-critico: #e5484d;
-  --variacao-piora: #d4a93a;
-  --variacao-melhora: #5fb58a;
-  --variacao-neutra: #a3a3a3;
+  --ponto-demo: #d4a93a;
 }
 
 @layer base {
