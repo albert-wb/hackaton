@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ALERT_MAX_ETA, ALERT_MIN_SCORE } from '../engine/pressure';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { ALERT_MAX_ETA, ALERT_MIN_SCORE, whatIfExtraTeam } from '../engine/pressure';
 import { stepClock } from '../engine/derived';
-import type { RegionId } from '../engine/types';
 import { levelColor, LEVELS } from '../lib/levels';
-import { useApp, type Panel } from '../state/AppContext';
-import { etaLine } from './RegionsCard';
+import { useApp } from '../state/AppContext';
 import { LEGEND_PATTERN } from './Patterns';
-import { OCCURRENCE_ICONS_CALOR, OCCURRENCE_ICONS_CHUVA, Icon } from './icons';
-import { LevelIcon, TeamSquares } from './ui';
+import { Icon } from './icons';
+import { LevelIcon } from './ui';
 
 /** Painel lateral sobre o conteúdo. Esc e clique fora fecham; o foco vai para o botão de fechar. */
 function Drawer({ title, sub, children, onClose }: { title: string; sub?: string; children: ReactNode; onClose: () => void }) {
@@ -33,82 +31,6 @@ function Drawer({ title, sub, children, onClose }: { title: string; sub?: string
         <div className="scroll min-h-0 flex-1 overflow-y-auto">{children}</div>
       </aside>
     </div>
-  );
-}
-
-function OccurrencesPanel() {
-  const { model, step, hazard, selectRegion } = useApp();
-  const [filter, setFilter] = useState<'todas' | RegionId>('todas');
-  const icons = hazard === 'chuva' ? OCCURRENCE_ICONS_CHUVA : OCCURRENCE_ICONS_CALOR;
-  const list = useMemo(
-    () => [...model.occNow].filter((o) => filter === 'todas' || o.regionId === filter).sort((a, b) => b.minutes - a.minutes || b.seq - a.seq),
-    [model.occNow, filter]
-  );
-  const nameOf = (id: string) => model.regions.find((r) => r.id === id)!.name;
-  const count = (id: RegionId) => model.occNow.filter((o) => o.regionId === id).length;
-  return (
-    <>
-      <div className="flex flex-col gap-2 border-b border-line px-4 py-3">
-        <div className="seg flex-wrap self-start" role="group" aria-label="Filtrar por região">
-          <button aria-pressed={filter === 'todas'} onClick={() => setFilter('todas')}>Todas <span className="num text-t3">{model.occNow.length}</span></button>
-          {model.regions.map((r) => <button key={r.id} aria-pressed={filter === r.id} onClick={() => setFilter(r.id)}>{r.name} <span className="num text-t3">{count(r.id)}</span></button>)}
-        </div>
-        <span className="t-micro">{list.length} {list.length === 1 ? 'ocorrência simulada' : 'ocorrências simuladas'} até {stepClock(step)}.</span>
-      </div>
-      <ul className="m-0 list-none p-0">
-        {list.map((o) => (
-          <li key={o.seq} className="border-b border-line">
-            <button className="row-hover flex w-full items-center gap-3 px-4 py-2.5 text-left" onClick={() => selectRegion(o.regionId)} aria-label={`${o.type}, ${o.time}, Região ${nameOf(o.regionId)}. Selecionar a região.`}>
-              <Icon name={icons[o.typeIndex]} size={16} className="flex-none text-t2" />
-              <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[13px]">{o.type}</span><span className="t-micro">Ocorrência {o.indexInRegion + 1} da região</span></span>
-              <span className="num flex-none text-[12px] text-t2">{o.time}</span>
-              <span className="pill pill-line w-[58px] flex-none justify-center" style={{ height: 18, padding: 0 }}>{nameOf(o.regionId)}</span>
-            </button>
-          </li>
-        ))}
-        {list.length === 0 && <li className="px-4 py-6 text-[12px] text-t2">Nenhuma ocorrência nesta região até o momento.</li>}
-      </ul>
-    </>
-  );
-}
-
-function ResourcesPanel() {
-  const { model, regionId, selectRegion, hazard } = useApp();
-  const chuva = hazard === 'chuva';
-  const t = model.totals;
-  return (
-    <>
-      <div className="flex items-baseline gap-2 border-b border-line px-4 py-3">
-        <span className="t-hero">{t.free}</span>
-        <span className="text-[13px] text-t2">de {t.teams} {chuva ? 'equipes livres' : 'equipes e refúgios disponíveis'} na cidade</span>
-      </div>
-      <ul className="m-0 list-none p-0">
-        {model.sorted.map((r) => {
-          const p = model.cur.regions[r.id];
-          return (
-            <li key={r.id} className="border-b border-line">
-              <button className="row-hover flex w-full flex-col gap-2 px-4 py-3 text-left" aria-pressed={r.id === regionId} onClick={() => selectRegion(r.id)} style={{ boxShadow: r.id === regionId ? 'inset 2px 0 0 #f5f5f5' : undefined }}>
-                <span className="flex items-center gap-2">
-                  <LevelIcon level={p.level} size={12} />
-                  <b className="text-[14px] font-semibold">{r.name}</b>
-                  <span className="t-level ml-1 text-[10px] text-t2">{LEVELS[p.level].name}</span>
-                  <span className="num ml-auto text-[13px]"><b className="font-semibold">{p.score}</b><span className="text-t2">/100</span></span>
-                </span>
-                <span className="flex items-center gap-3">
-                  <TeamSquares total={p.teamsTotal} free={p.teamsFree} size={14} />
-                  <span className="num text-[12px]">{p.teamsFree} de {p.teamsTotal} {chuva ? 'equipes livres' : 'disponíveis'}</span>
-                </span>
-                <span className="flex justify-between text-[11px] text-t2">
-                  <span>{p.active} {chuva ? 'ocorrências ativas' : 'atendimentos ativos'}</span>
-                  <span>{etaLine(p.etaMinutes)}</span>
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="m-0 px-4 py-3 text-[11px] leading-[15px] text-t2">Quadrado cheio = equipe ocupada · quadrado vazado = equipe livre. Dados simulados.</p>
-    </>
   );
 }
 
@@ -170,21 +92,60 @@ function HowItWorksPanel() {
       </section>
       <section className="border border-line p-3" style={{ borderRadius: 2 }}>
         <b className="font-semibold">Modo demonstração</b>
-        <p className="m-0 mt-1 text-t2">Todos os dados são simulados, de forma determinística: o mesmo passo e a mesma intensidade sempre geram o mesmo resultado. A geometria das zonas do mapa é editável em <span className="num">src/data/zones.geo.json</span>.</p>
+        <p className="m-0 mt-1 text-t2">Todos os dados são simulados, de forma determinística: o mesmo passo sempre gera o mesmo resultado (cenário único: Super El Niño). A geometria das zonas do mapa é editável em <span className="num">src/data/zones.geo.json</span>.</p>
       </section>
     </div>
   );
 }
 
 export function PanelHost() {
-  const { panel, setPanel, hazard } = useApp();
-  if (!panel) return null;
-  const close = () => setPanel(null);
-  const meta: Record<Exclude<Panel, null>, { title: string; sub: string; body: ReactNode }> = {
-    ocorrencias: { title: 'Ocorrências', sub: hazard === 'chuva' ? 'Todas as ocorrências simuladas até o momento' : 'Todos os atendimentos simulados até o momento', body: <OccurrencesPanel /> },
-    recursos: { title: 'Recursos', sub: 'Equipes por região, no instante do replay', body: <ResourcesPanel /> },
-    como: { title: 'Como funciona', sub: 'Pressure Engine: fórmula, fatores e níveis', body: <HowItWorksPanel /> }
-  };
-  const m = meta[panel];
-  return <Drawer key={panel} title={m.title} sub={m.sub} onClose={close}>{m.body}</Drawer>;
+  const { panel, setPanel } = useApp();
+  if (panel !== 'como') return null;
+  return <Drawer title="Como funciona" sub="Pressure Engine: fórmula, fatores e níveis" onClose={() => setPanel(null)}><HowItWorksPanel /></Drawer>;
+}
+
+/** Comparativo "Antes → Depois" de uma equipe a mais na região selecionada, no passo atual. */
+export function WhatIfDialog() {
+  const { whatIf, setWhatIf, model, regionId, step } = useApp();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const wi = useMemo(() => (whatIf ? whatIfExtraTeam(model.snap, model.steps, regionId, step) : null), [whatIf, model.snap, model.steps, regionId, step]);
+  useEffect(() => {
+    if (!whatIf) return;
+    closeRef.current?.focus();
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setWhatIf(false); };
+    document.addEventListener('keydown', key);
+    return () => document.removeEventListener('keydown', key);
+  }, [whatIf, setWhatIf]);
+  if (!wi) return null;
+  const region = model.regions.find((r) => r.id === regionId)!;
+  const before = model.cur.regions[regionId];
+  const etaTxt = (e: typeof before.etaMinutes) => (e === 'saturado' ? 'Saturado' : e === null ? 'Sem tendência' : `~${Math.max(1, Math.round(e))} min`);
+  const cards = [{ t: 'Antes', pr: before }, { t: 'Depois', pr: wi }];
+  return (
+    <div className="absolute inset-0 z-[60] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }} onPointerDown={(e) => { if (e.target === e.currentTarget) setWhatIf(false); }}>
+      <div role="dialog" aria-modal="true" aria-label="E se mais uma equipe" className="card flex w-[460px] flex-col gap-3 p-4" style={{ background: '#161616' }}>
+        <i className="lm lm-tl" /><i className="lm lm-tr" /><i className="lm lm-bl" /><i className="lm lm-br" />
+        <div className="flex items-center justify-between">
+          <b className="text-[14px] font-semibold">E se +1 equipe? · Região {region.name}</b>
+          <button ref={closeRef} className="btn" style={{ height: 26, width: 26, padding: 0 }} aria-label="Fechar comparação" onClick={() => setWhatIf(false)}><Icon name="close" size={13} /></button>
+        </div>
+        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 20px 1fr' }}>
+          <Side {...cards[0]} etaTxt={etaTxt} />
+          <Icon name="arrowRight" size={18} className="text-t2" />
+          <Side {...cards[1]} etaTxt={etaTxt} strong />
+        </div>
+        <span className="t-micro">Considera uma equipe adicional livre em {stepClock(step)}. Estimativa por tendência; não validada.</span>
+      </div>
+    </div>
+  );
+}
+
+function Side({ t, pr, etaTxt, strong }: { t: string; pr: { score: number; level: 0 | 1 | 2 | 3; etaMinutes: number | 'saturado' | null }; etaTxt: (e: number | 'saturado' | null) => string; strong?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1 border p-3" style={{ borderRadius: 2, borderColor: strong ? '#f5f5f5' : '#262626' }}>
+      <span className="t-micro">{t}</span>
+      <span className="flex items-baseline gap-2"><span className="t-hero">{pr.score}</span><LevelIcon level={pr.level} size={12} /><span className="t-level text-[10px]">{LEVELS[pr.level].name}</span></span>
+      <span className="text-[11px] text-t2">Tempo até saturação: <span className="num text-t1">{etaTxt(pr.etaMinutes)}</span></span>
+    </div>
+  );
 }

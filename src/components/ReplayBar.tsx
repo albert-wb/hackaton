@@ -5,12 +5,11 @@ import { Icon } from './icons';
 import { Card } from './ui';
 
 export function ReplayBar() {
-  const { step, setStep, playing, togglePlay, speed, setSpeed, restart, intensity, setIntensity } = useApp();
+  const { step, setStep, playing, togglePlay, speed, setSpeed, restart } = useApp();
   const atEnd = step >= STEP_COUNT - 1;
-  const pct = Math.round(intensity * 100);
 
   return (
-    <Card label="Controles do replay" className="flex items-center gap-4 px-3" style={{ height: 52 }}>
+    <Card label="Controles do replay" className="flex items-center gap-4 px-3" style={{ height: 56 }}>
       <div className="flex flex-none items-center gap-1.5">
         <button className="btn btn-white" style={{ width: 34, height: 34, padding: 0, borderRadius: 999 }} onClick={togglePlay} aria-label={playing ? 'Pausar replay' : atEnd ? 'Reiniciar e reproduzir' : 'Reproduzir replay'}>
           <Icon name={playing ? 'pause' : 'play'} size={15} />
@@ -41,14 +40,7 @@ export function ReplayBar() {
       </div>
       <button className="btn flex-none" onClick={restart}><Icon name="restart" size={13} />Reiniciar</button>
 
-      <div className="flex w-[300px] flex-none flex-col justify-center border-l border-line pl-4">
-        <div className="flex items-center justify-between text-[11px] leading-[14px]">
-          <label htmlFor="intensidade" className="text-t2">Intensidade do cenário</label>
-          <span className="num font-semibold">{pct}%</span>
-        </div>
-        <input id="intensidade" type="range" className="track" min={0} max={100} step={1} value={pct} onChange={(e) => setIntensity(Number(e.target.value) / 100)} aria-valuetext={`${pct}%, entre Ano normal e Super El Niño`} />
-        <div className="-mt-0.5 flex justify-between text-[10px] leading-3 text-t2"><span>Ano normal</span><span>Super El Niño</span></div>
-      </div>
+      <span className="flex-none border-l border-line pl-4 text-[11px] leading-4 text-t2">Cenário: <b className="font-semibold text-t1">Super El Niño</b> · dados simulados</span>
     </Card>
   );
 }

@@ -2,14 +2,17 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEven
 import { mapData, fitTo, pathOfLine, pathOfMulti, toPx } from '../data/mapData';
 import { REGIONS } from '../data/regions';
 import { OCCURRENCE_ICONS_CALOR, OCCURRENCE_ICONS_CHUVA, Icon, type IconName } from './icons';
-import { LEVELS, levelColor, levelPatternId, levelTint } from '../lib/levels';
+import { LEVELS, RED, levelPatternId, levelTint } from '../lib/levels';
 import { useSize } from '../lib/hooks';
 import { fmt } from '../lib/format';
 import type { RegionId } from '../engine/types';
 import type { Pt } from '../lib/geo';
 import { useApp, type LayerKey } from '../state/AppContext';
 import type { MapTab } from '../state/urlState';
-import { Card, CardHead, LevelIcon, LevelPill } from './ui';
+import { useCountUp } from '../lib/hooks';
+import { stepClock } from '../engine/derived';
+import { signed } from '../lib/format';
+import { Arrow, Card, LevelIcon, LevelPill, deltaColor } from './ui';
 import { LEGEND_PATTERN } from './Patterns';
 
 const TABS: Array<{ k: MapTab; label: string }> = [
@@ -24,13 +27,13 @@ const INFRA_KINDS: Record<RegionId, IconName[]> = { norte: ['health', 'school'],
 interface View { k: number; x: number; y: number }
 const clamp = (v: number, a: number, b: number) => Math.min(Math.max(v, a), b);
 
-export function MapCard({ expanded = false }: { expanded?: boolean }) {
+export function MapCard() {
   const app = useApp();
-  const { model, regionId, selectRegion, mapTab, setMapTab, setFullscreen, layers, toggleLayer, hazard } = app;
+  const { model, regionId, selectRegion, mapTab, setMapTab, layers, toggleLayer, hazard } = app;
   const boxRef = useRef<HTMLDivElement>(null);
   const { w: W0, h: H0 } = useSize(boxRef);
   const W = W0 || 600, H = H0 || 340;
-  const fit = useMemo(() => fitTo(W, H, 26, 38, 172), [W, H]);
+  const fit = useMemo(() => fitTo(W, H, 18, 44, 44), [W, H]);
   const [view, setView] = useState<View>({ k: 1, x: 0, y: 0 });
   const [hover, setHover] = useState<{ id: RegionId; x: number; y: number } | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
@@ -93,7 +96,6 @@ export function MapCard({ expanded = false }: { expanded?: boolean }) {
   }), [fit]);
   const streamPaths = useMemo(() => mapData.streams.map((s) => ({ name: s.name, d: pathOfLine(s.pts, fit) })), [fit]);
 
-  const alert = model.alerts[0];
   const hasRoads = mapData.roads.length > 0;
   const hasStreams = mapData.streams.length > 0;
   const showZones = layers.zonas;
@@ -111,20 +113,14 @@ export function MapCard({ expanded = false }: { expanded?: boolean }) {
   const labelOf = (id: RegionId) => S(mapData.zones[id].label);
 
   return (
-    <Card className="flex flex-col" label="Mapa operacional" style={expanded ? { height: '100%' } : undefined}>
-      <CardHead
-        icon="target" title="Mapa operacional"
-        right={
-          <>
-            <div className="seg" role="tablist" aria-label="Camada do mapa">
-              {TABS.map((t) => <button key={t.k} role="tab" aria-selected={mapTab === t.k} onClick={() => setMapTab(t.k)}>{t.label}</button>)}
-            </div>
-            <button className="btn" style={{ width: 28, padding: 0 }} aria-label={expanded ? 'Sair da tela cheia' : 'Mapa em tela cheia'} onClick={() => setFullscreen(expanded ? null : 'mapa')}>
-              <Icon name={expanded ? 'shrink' : 'expand'} size={14} />
-            </button>
-          </>
-        }
-      />
+    <Card className="flex min-h-0 flex-col" label="Mapa de pressão" style={{ flex: '56 1 0%' }}>
+      <MapHeader />
+      <div className="flex h-9 flex-none items-center justify-between border-b border-line px-3">
+        <span className="t-micro">Zonas da cidade · clique para selecionar</span>
+        <div className="seg" role="tablist" aria-label="Camada do mapa">
+          {TABS.map((t) => <button key={t.k} role="tab" aria-selected={mapTab === t.k} onClick={() => setMapTab(t.k)} style={{ height: 22, padding: '0 10px', fontSize: 11 }}>{t.label}</button>)}
+        </div>
+      </div>
       <div ref={boxRef} className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#0c0c0c' }}>
         <svg
           ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group" aria-label="Mapa de Franca com as quatro zonas"
@@ -154,7 +150,7 @@ export function MapCard({ expanded = false }: { expanded?: boolean }) {
                     vectorEffect="non-scaling-stroke"
                     style={{
                       fill: pressure ? levelTint(p.level) : '#141414',
-                      stroke: pressure ? levelColor(p.level) : '#3a3a3a',
+                      stroke: pressure ? (p.level === 3 ? RED : '#6e6e6e') : '#3a3a3a',
                       strokeWidth: 1.5
                     }}
                     onClick={() => { if (!suppressClick.current) selectRegion(r.id); }}
@@ -205,7 +201,7 @@ export function MapCard({ expanded = false }: { expanded?: boolean }) {
                     <>
                       <text x={c[0]} y={c[1] - 11} textAnchor="middle" fontSize="11" fontWeight="500" fill="#f5f5f5" stroke="#0a0a0a" strokeWidth="3" paintOrder="stroke">{r.name}</text>
                       <rect x={c[0] - 28} y={c[1] - 6} width="56" height="19" rx="9.5" fill="#f5f5f5" />
-                      <g transform={`translate(${c[0] - 21} ${c[1] - 1.5})`}><LevelIcon level={p.level} size={10} outline /></g>
+                      <g transform={`translate(${c[0] - 21} ${c[1] - 1.5})`}><LevelIcon level={p.level} size={10} onWhite /></g>
                       <text x={c[0] + 12} y={c[1] + 8} textAnchor="middle" fontSize="12" fontWeight="600" fill="#0a0a0a" className="num">{p.score}</text>
                     </>
                   )}
@@ -271,53 +267,34 @@ export function MapCard({ expanded = false }: { expanded?: boolean }) {
           </div>
         </div>
 
-        {/* legenda */}
-        <div className="absolute right-2 top-2 w-[154px] border border-line2 bg-s1 p-2" aria-label="Legenda: nível de pressão" style={{ borderRadius: 2 }}>
-          <div className="t-micro mb-1 text-t1">Nível de pressão</div>
-          <ul className="m-0 flex list-none flex-col gap-[3px] p-0">
+        {/* legenda compacta (canto inferior esquerdo) */}
+        <div className="absolute bottom-2 left-2 border border-line2 bg-s1 px-2 py-1.5" aria-label="Legenda: nível de pressão" style={{ borderRadius: 2 }}>
+          <ul className="m-0 flex list-none flex-col gap-[2px] p-0">
             {LEVELS.map((l, i) => (
               <li key={l.key} className="flex items-center gap-1.5">
-                <LevelIcon level={i as 0 | 1 | 2 | 3} size={10} />
-                <svg width="16" height="10" aria-hidden="true"><rect x="0.5" y="0.5" width="15" height="9" fill="#141414" stroke="#6e6e6e" />{LEGEND_PATTERN[i] && <rect x="0.5" y="0.5" width="15" height="9" fill={`url(#${LEGEND_PATTERN[i]})`} />}</svg>
-                <span className="num w-[38px] text-[10px] text-t2">{l.range}</span>
-                <span className="t-level text-[10px]">{l.name}</span>
+                <LevelIcon level={i as 0 | 1 | 2 | 3} size={9} />
+                <svg width="16" height="9" aria-hidden="true"><rect x="0.5" y="0.5" width="15" height="8" fill="#141414" stroke="#6e6e6e" />{LEGEND_PATTERN[i] && <rect x="0.5" y="0.5" width="15" height="8" fill={`url(#${LEGEND_PATTERN[i]})`} />}</svg>
+                <span className="t-level w-[48px] text-[9.5px]">{l.name}</span>
+                <span className="num text-[9.5px] text-t2">{l.range}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* callout de alerta */}
-        {alert && (
-          <button
-            onClick={() => selectRegion(alert.regionId)}
-            className="callout-in absolute bottom-[40px] right-2 flex w-[214px] items-center gap-2 border bg-s1 p-2 text-left"
-            style={{ borderRadius: 2, borderColor: levelColor(alert.kind === 'esgotada' ? 3 : model.cur.regions[alert.regionId].level), background: levelTint(alert.kind === 'esgotada' ? 3 : model.cur.regions[alert.regionId].level) }}
-            aria-label={alert.kind === 'esgotada' ? `Capacidade esgotada, Região ${REGIONS.find((r) => r.id === alert.regionId)!.name}` : `Possível saturação, Região ${REGIONS.find((r) => r.id === alert.regionId)!.name} em cerca de ${alert.etaMinutes} minutos`}
-          >
-            <Icon name="alert" size={18} />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <b className="text-[12px] font-semibold leading-4">{alert.kind === 'esgotada' ? 'Capacidade esgotada' : 'Possível saturação'}</b>
-              <span className="text-[11px] leading-[14px] text-t1">Região {REGIONS.find((r) => r.id === alert.regionId)!.name}{alert.kind === 'saturacao' && <> em <span className="num">~{alert.etaMinutes} min</span></>}</span>
-            </span>
-            <Icon name="right" size={14} />
-          </button>
-        )}
+        {/* escala e norte, discretos */}
+        <div className="pointer-events-none absolute right-2 top-2 flex items-end gap-2 text-t2" aria-hidden="true">
+          <div className="flex flex-col items-end gap-0.5" aria-label={`Escala: ${nice} quilômetros`}>
+            <span className="num text-[10px] leading-3">{mapData.approximate ? '~' : ''}{fmt(nice, nice < 1 ? 1 : 0)} km</span>
+            <span className="block h-[5px] border border-t-0 border-t2" style={{ width: nice * pxPerKm }} />
+          </div>
+          <div className="flex flex-col items-center"><span className="text-[10px] font-semibold leading-3">N</span><Icon name="arrowUp" size={12} /></div>
+        </div>
 
-        {/* rodapé do mapa */}
-        <div className="pointer-events-none absolute bottom-1.5 left-2 right-2 flex items-end justify-between gap-3">
-          <div className="flex items-end gap-3">
-            <div className="flex flex-col items-center text-t2" aria-hidden="true">
-              <span className="text-[10px] font-semibold leading-3">N</span><Icon name="arrowUp" size={12} />
-            </div>
-            <div className="flex flex-col gap-0.5" aria-label={`Escala: ${nice} quilômetros`}>
-              <span className="num text-[10px] leading-3 text-t2">{mapData.approximate ? '~' : ''}{fmt(nice, nice < 1 ? 1 : 0)} km</span>
-              <span className="block h-[5px] border border-t-0 border-t2" style={{ width: nice * pxPerKm }} />
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-0 text-right text-[10px] leading-3 text-t2">
-            <span>{mapData.approximate ? 'Geometria aproximada. ' : ''}Limites das zonas aproximados, não oficiais.</span>
-            <span>{mapData.attribution ?? 'Sem dados do OpenStreetMap carregados (veja o README).'}{(layers.infra || layers.refugios) && ' · Infraestrutura e refúgios: ícones ilustrativos.'}</span>
-          </div>
+        {/* aviso permanente e atribuição (canto inferior direito) */}
+        <div className="pointer-events-none absolute bottom-1.5 right-2 flex flex-col items-end text-right text-[10px] leading-3 text-t2">
+          <span>Limites das zonas aproximados, não oficiais.</span>
+          {(layers.infra || layers.refugios) && <span>Ícones de infraestrutura e refúgios: ilustrativos.</span>}
+          <span>{mapData.approximate ? 'Geometria aproximada, sem dados do OpenStreetMap.' : '© OpenStreetMap contributors'}</span>
         </div>
 
         {/* tooltip da zona */}
@@ -334,5 +311,54 @@ export function MapCard({ expanded = false }: { expanded?: boolean }) {
         )}
       </div>
     </Card>
+  );
+}
+
+function Mini({ label, value, unit, delta, deltaText }: { label: string; value: string; unit?: string; delta: number | null; deltaText: string }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <span className="t-micro">{label}</span>
+      <span className="flex items-baseline gap-1.5">
+        <span className="num text-[15px] font-semibold leading-5">{value}</span>
+        {unit && <span className="text-[10.5px] text-t2">{unit}</span>}
+        <span className="num flex items-center gap-0.5 text-[11px]" style={{ color: deltaColor(delta) }}>
+          {delta !== null && <Arrow delta={delta} size={10} />}{delta === null ? '—' : `(${deltaText})`}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function MapHeader() {
+  const { model, step, hazard } = useApp();
+  const chuva = hazard === 'chuva';
+  const first = step === 0;
+  const city = model.cur.city;
+  const hero = useCountUp(city.score);
+  const w = model.cur.weather;
+  const dW = first ? null : w - model.steps[step - 1].weather;
+  const tp = model.totalsPrev;
+  const dAct = first || !tp ? null : model.totals.active - tp.active;
+  const dFree = first || !tp ? null : model.totals.free - tp.free;
+  const dCity = first ? null : city.deltaVs10min;
+  return (
+    <div className="flex h-[76px] flex-none items-center gap-6 border-b border-line px-4">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex items-center gap-2">
+          <span className="flex items-baseline gap-1"><span className="t-hero" aria-label={`Pressão da cidade ${city.score} de 100`}>{fmt(hero)}</span><span className="num text-[13px] text-t3">/100</span></span>
+          <LevelPill level={city.level} />
+        </span>
+        <span className="text-[12px] leading-4 text-t2">Pressão operacional da cidade · {stepClock(step)}</span>
+      </div>
+      <div className="flex flex-1 items-center justify-center gap-6">
+        <Mini label={chuva ? 'Chuva' : 'Índice de calor'} value={fmt(w, 1)} unit={chuva ? 'mm/h' : '°C'} delta={dW} deltaText={signed(dW ?? 0, 1)} />
+        <Mini label={chuva ? 'Ocorrências ativas' : 'Atendimentos ativos'} value={fmt(model.totals.active)} delta={dAct} deltaText={signed(dAct ?? 0)} />
+        <Mini label={chuva ? 'Equipes livres' : 'Equipes e refúgios'} value={`${model.totals.free} de ${model.totals.teams}`} delta={dFree} deltaText={signed(dFree ?? 0)} />
+      </div>
+      <div className="flex flex-none flex-col items-end" style={{ color: deltaColor(dCity) }}>
+        <span className="num flex items-center gap-1 text-[14px] font-semibold">{dCity === null ? '—' : <><Arrow delta={dCity} size={13} />{Math.abs(dCity)} pts</>}</span>
+        <span className="t-micro">vs 10 min antes</span>
+      </div>
+    </div>
   );
 }

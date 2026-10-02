@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
-import { AlertCard } from './components/AlertCard';
-import { ConditionsCard } from './components/ConditionsCard';
-import { KpiRow } from './components/KpiRow';
+import { AlertsFeed } from './components/AlertsFeed';
+import { HeatmapCard } from './components/HeatmapCard';
 import { MapCard } from './components/MapCard';
-import { OccurrencesCard } from './components/OccurrencesCard';
-import { PanelHost } from './components/Panels';
+import { PanelHost, WhatIfDialog } from './components/Panels';
 import { Patterns } from './components/Patterns';
-import { PressureEvolution } from './components/PressureEvolution';
-import { RegionDetails } from './components/RegionDetails';
-import { RegionsCard } from './components/RegionsCard';
+import { QuickActions } from './components/QuickActions';
+import { RegionsRanking } from './components/RegionsRanking';
 import { ReplayBar } from './components/ReplayBar';
+import { SelectedRegion } from './components/SelectedRegion';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { AppProvider, useApp } from './state/AppContext';
@@ -31,51 +29,34 @@ function useFrameScale(): number {
 function Skeleton() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" aria-busy="true" aria-label="Carregando cenário">
-      <div className="grid grid-cols-4 gap-3">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 84 }} />)}</div>
-      <div className="grid min-h-0 flex-1 gap-3" style={{ gridTemplateColumns: '264px minmax(0,1fr) 340px' }}>
-        <div className="flex flex-col gap-3"><div className="skeleton" style={{ height: 244 }} /><div className="skeleton flex-1" /></div>
-        <div className="skeleton" /><div className="skeleton" />
-      </div>
-      <div className="grid gap-3" style={{ gridTemplateColumns: '4fr 3fr 3fr', height: 228 }}>{[0, 1, 2].map((i) => <div key={i} className="skeleton" />)}</div>
+      <div className="flex gap-3" style={{ height: 400 }}><div className="skeleton" style={{ flex: 56 }} /><div className="skeleton" style={{ flex: 44 }} /></div>
+      <div className="grid min-h-0 flex-1 grid-cols-4 gap-3">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton" />)}</div>
     </div>
   );
 }
 
 function Dashboard() {
-  const { loading, fullscreen, setFullscreen } = useApp();
-  useEffect(() => {
-    if (!fullscreen) return;
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(null); };
-    document.addEventListener('keydown', key);
-    return () => document.removeEventListener('keydown', key);
-  }, [fullscreen, setFullscreen]);
-
+  const { loading } = useApp();
   return (
-    <main className="relative flex min-w-0 flex-1 flex-col gap-3 p-3" aria-label="Painel de operações">
+    <main className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3" aria-label="Painel de operações">
       <h1 className="sr-only">StormOps Franca: painel de operações da Defesa Civil</h1>
       {loading ? <Skeleton /> : (
-        <div className="flex min-h-0 flex-1 flex-col gap-3" aria-hidden={fullscreen ? true : undefined}>
-          <KpiRow />
-          <div className="grid min-h-0 flex-1 gap-3" style={{ gridTemplateColumns: '264px minmax(0,1fr) 340px' }}>
-            <div className="flex min-h-0 flex-col gap-3"><RegionsCard /><ConditionsCard /></div>
+        <>
+          <div className="flex min-h-0 gap-3" style={{ height: 400 }}>
             <MapCard />
-            <RegionDetails />
+            <SelectedRegion />
           </div>
-          <div className="grid gap-3" style={{ gridTemplateColumns: '4fr 3fr 3fr', height: 228 }}>
-            <PressureEvolution />
-            <AlertCard />
-            <OccurrencesCard />
+          <div className="grid min-h-0 flex-1 grid-cols-4 gap-3">
+            <RegionsRanking />
+            <AlertsFeed />
+            <HeatmapCard />
+            <QuickActions />
           </div>
-        </div>
+        </>
       )}
       <ReplayBar />
-
-      {fullscreen && (
-        <div className="absolute inset-x-3 top-3 z-30 flex flex-col bg-base" style={{ bottom: 12 + 52 + 12 }}>
-          {fullscreen === 'mapa' ? <MapCard expanded /> : <PressureEvolution expanded />}
-        </div>
-      )}
       <PanelHost />
+      <WhatIfDialog />
     </main>
   );
 }
@@ -87,12 +68,12 @@ export function App() {
       <Patterns />
       <div className="fixed inset-0 overflow-hidden bg-base">
         <div
-          className="absolute left-1/2 top-1/2 flex flex-col bg-base text-t1"
+          className="absolute left-1/2 top-1/2 flex bg-base text-t1"
           style={{ width: W, height: H, transform: `translate(-50%, -50%) scale(${scale})` }}
         >
-          <TopBar />
-          <div className="flex min-h-0 flex-1">
-            <Sidebar />
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar />
             <Dashboard />
           </div>
         </div>
