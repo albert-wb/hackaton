@@ -29,22 +29,22 @@ O estado do painel fica na URL e é lido dela, o que permite abrir direto cada t
 | Parâmetro | Valores | Exemplo |
 | --- | --- | --- |
 | `passo` | 0 a 4 (14:00, 14:10, 14:20, 14:30, 14:40) | `?passo=3` |
-| `intensidade` | 0 (Ano normal) a 1 (Super El Niño) | `?intensidade=0` |
 | `regiao` | `norte`, `centro`, `leste`, `sul` | `?regiao=leste` |
 | `aba` | `chuva`, `calor` | `?aba=calor` |
 | `mapa` | `pressao`, `ocorrencias`, `recursos` | `?mapa=recursos` |
 
-Exemplo: `http://localhost:5173/?passo=3&intensidade=1&regiao=norte&aba=chuva&mapa=pressao`.
+Exemplo: `http://localhost:5173/?passo=3&regiao=norte&aba=chuva&mapa=pressao`.
 
 ## O que há no painel
 
-- **Faixa de indicadores:** chuva (ou índice de calor), ocorrências ativas, equipes livres e pressão da cidade, cada um com a variação em relação a 10 minutos antes.
-- **Regiões, Condições atuais e Mapa operacional** (abas Pressão, Ocorrências e Recursos; zoom, arrastar, camadas, legenda e callout de alerta).
-- **Detalhes da região:** medidor de 0 a 100, tempo até saturação, seis fatores que somam exatamente a pressão exibida, tendência e a comparação "E se +1 equipe?".
-- **Evolução da pressão** (Pressão, Ocorrências e Equipes livres), **Alerta operacional** e **Últimas ocorrências**.
-- **Replay** de 14:00 a 14:40 (1x, 2x e 4x) e o controle de **intensidade do cenário**, de Ano normal a Super El Niño.
-- **Aba Calor:** os mesmos cards, trocando chuva por índice de calor, ocorrências por atendimentos e equipes por equipes e refúgios.
-- **Barra lateral:** Mapa operacional e Evolução temporal abrem em tela cheia; Ocorrências e Recursos abrem painéis; "Como funciona" explica a fórmula. Relatórios e Configurações estão fora do escopo do protótipo.
+O painel tem um cenário único, **Super El Niño**, com replay de 14:00 a 14:40.
+
+- **Mapa de pressão** (cartão grande): pressão da cidade, chuva (ou índice de calor), ocorrências ativas e equipes livres com variação em relação a 10 minutos antes, e o mapa de Franca com 4 zonas (abas Pressão, Ocorrências e Recursos; zoom, arrastar, camadas e legenda).
+- **Região selecionada** (cartão grande): pontuação, tempo até saturação, pizza hachurada com os seis fatores (pontos inteiros que somam a pontuação) e o principal fator.
+- **Regiões por pressão**, **Alertas** (feed com a antecedência do primeiro alerta), **Pressão ao longo do tempo** (mapa de calor 5×5) e **Ações rápidas** ("E se +1 equipe?", "Ir ao primeiro alerta", reiniciar e "Como funciona").
+- **Replay** com play/pausa, passo a passo, scrubber e velocidades 1x, 2x e 4x.
+- **Aba Calor:** os mesmos cartões, trocando chuva por índice de calor, ocorrências por atendimentos e equipes por equipes e refúgios.
+- **Barra lateral:** só ícones. "Visão geral" e "Como funciona" (painel com a fórmula, os fatores e os níveis) funcionam; os demais mostram "Fora do escopo do protótipo".
 
 ## Pressure Engine
 
@@ -59,7 +59,7 @@ As funções puras ficam em `src/engine/pressure.ts`, sem dependência de UI.
 | Vulnerabilidade | 10 × vulnerabilidade da região (0 a 1) | 10 |
 | Infraestrutura crítica | 5 × mín(itens críticos ÷ 2; 1) | 5 |
 
-- **Níveis:** NORMAL 0–25, ATENÇÃO 26–50, ELEVADO 51–75, CRÍTICO 76–100. Cada nível tem ícone, padrão, nome e cor (nunca só cor).
+- **Níveis:** NORMAL 0–25, ATENÇÃO 26–50, ELEVADO 51–75, CRÍTICO 76–100. Cada nível tem ícone, padrão, nome e cor (nunca só cor). O vermelho é usado só em CRÍTICO, saturação e capacidade esgotada.
 - **Cidade:** 0,5 × a maior região + 0,5 × a média das regiões.
 - **Tempo até saturação:** sem equipes livres, "saturado"; se a demanda cresce, (equipes livres ÷ crescimento) × 10 min; senão, sem tendência.
 - **Alerta:** pressão de 45 ou mais e tempo até saturação de 15 min ou menos.
@@ -75,7 +75,7 @@ Valores de aceitação do cenário Super El Niño (tolerância de ±1), cobertos
 | Sul | 11 | 16 | 29 | 26 | 35 |
 | Cidade | 18 | 37 | 56 | 68 | 75 |
 
-Eventos: alerta do Norte às 14:10 (~10 min), Norte esgotado às 14:30, alerta do Leste às 14:40. No Ano normal, o Norte chega a no máximo ~43 e nenhum alerta dispara.
+Eventos: alerta do Norte às 14:10 (~10 min), Norte esgotado às 14:30, alerta do Leste às 14:40.
 
 A fonte dos dados é a interface `DataProvider` (`src/data/provider.ts`). Hoje há só a `SimulationDataProvider`; uma fonte real
 poderá implementar a mesma interface sem mexer no engine.
@@ -106,26 +106,27 @@ Dados do mapa, quando vierem do OpenStreetMap: © OpenStreetMap contributors, li
 
 ```
 src/
-  engine/       pressure.ts (funções puras), derived.ts (ocorrências, alertas, condições), types.ts, pressure.test.ts
+  engine/       pressure.ts (funções puras), derived.ts (ocorrências, feed de alertas, totais), types.ts, pressure.test.ts
   data/         regions.ts, scenarios.ts, provider.ts, mapData.ts, franca.geo.json, zones.geo.json
   state/        AppContext.tsx (estado e modelo), urlState.ts (estado na URL)
-  components/   um arquivo por card: TopBar, Sidebar, KpiRow, RegionsCard, ConditionsCard, MapCard,
-                RegionDetails, PressureEvolution, AlertCard, OccurrencesCard, ReplayBar, Panels
+  components/   um arquivo por cartão: TopBar, Sidebar, MapCard, SelectedRegion, RegionsRanking, AlertsFeed,
+                HeatmapCard, QuickActions, ReplayBar, Panels (Como funciona e "E se +1 equipe?")
   lib/          geo.ts, levels.ts, hooks.ts, format.ts
 scripts/        fetch-osm.mjs, make-zones.mjs, make-approx.mjs, geo-utils.mjs
 ```
 
-Tema: cinzas neutros, marcas em L nos cantos dos cards, raio de 2 px, sem gradientes nem sombras. As cores dos níveis são
-variáveis CSS (`--nivel-*` em `src/index.css`); para um tema só em cinza, basta redefini-las, pois ícones, padrões e rótulos
-já diferenciam os níveis.
+Tema: cinzas neutros puros, marcas em L nos cantos dos cartões, raio de 2 px, sem gradientes nem sombras. As cores dos níveis
+são variáveis CSS (`--nivel-normal`, `--nivel-atencao`, `--nivel-elevado`, `--nivel-critico` em `src/index.css`); o time pode
+trocá-las sem tocar nos componentes.
 
 ## Branches
 
 O repositório tem 5 branches individuais, todas criadas a partir do mesmo commit da `main`: `Albert`, `Felipe`, `Lais`,
-`Amanda` e `Nathan`. Cada pessoa trabalha na sua branch e abre um Pull Request para a `main`. Antes de abrir o PR, rode
-`npm test` e `npm run build`.
+`Amanda` e `Nathan`. **O redesenho (cenário único, novo layout e novo tema) vive na branch `Albert`**; as outras quatro e a
+`main` continuam no commit-base. Cada pessoa trabalha na sua branch e abre um Pull Request para a `main`. Antes de abrir o PR,
+rode `npm test` e `npm run build`.
 
 ## Fora do escopo do protótipo
 
-Autenticação, dados reais de Defesa Civil, previsão meteorológica de verdade, Relatórios e Configurações, e qualquer
+Autenticação, dados reais de Defesa Civil, previsão meteorológica de verdade, as páginas Mapa, Ocorrências, Equipes, Alertas, Ajuda e Configurações da barra lateral, e qualquer
 integração com órgãos externos.
